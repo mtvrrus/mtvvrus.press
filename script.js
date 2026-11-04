@@ -1,0 +1,2 @@
+// Static GitHub Pages frontend. Telegram posts link to official channel; automatic feed needs a CORS-enabled proxy/API.
+if(location.pathname.replace(/\/+$/,"")==="/admin")location.replace("./admin/");
