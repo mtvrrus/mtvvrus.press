@@ -1,2 +1,15 @@
-// Static GitHub Pages frontend. Telegram posts link to official channel; automatic feed needs a CORS-enabled proxy/API.
-if(location.pathname.replace(/\/+$/,"")==="/admin")location.replace("./admin/");
+/* Public Telegram RSS feed via RSSHub. This is a third-party public RSS bridge, not a Telegram bot.
+   If RSSHub is unavailable/CORS-blocked, the page gracefully links users to the channel. */
+const FEED_URLS=[
+ "https://rsshub.app/telegram/channel/mtv_1russia",
+ "https://rsshub.rssforever.com/telegram/channel/mtv_1russia"
+];
+const grid=document.querySelector("#news-grid"),statusEl=document.querySelector("#feed-status"),refresh=document.querySelector("#refresh-feed");
+function cleanHTML(html){const d=new DOMParser().parseFromString(html||"","text/html");return (d.body.textContent||"").replace(/\s+/g," ").trim();}
+function safeDate(raw){const d=new Date(raw);return Number.isNaN(d.getTime())?"":d.toLocaleDateString("ru-RU",{day:"numeric",month:"long"});}
+function card(item,i){const title=cleanHTML(item.title)||"Публикация MTV Россия";const desc=cleanHTML(item.description||item.content||"");const link=item.link||"https://t.me/mtv_1russia";const date=safeDate(item.pubDate||item.isoDate);const el=document.createElement("article");el.className="news-card"+(i===0?" featured":"");const meta=document.createElement("div");meta.className="meta";meta.textContent="MTV NEWS"+(date?" · "+date:"");const h=document.createElement("h3");h.textContent=title;el.append(meta,h);if(desc&&desc!==title){const p=document.createElement("p");p.textContent=desc.slice(0,220)+(desc.length>220?"…":"");el.append(p);}const a=document.createElement("a");a.className="read";a.href=link;a.target="_blank";a.rel="noopener";a.textContent="Читать публикацию ↗";el.append(a);return el;}
+async function loadFeed(){refresh.disabled=true;statusEl.innerHTML='<span class="loader"></span> Загружаем публикации из Telegram…';let lastError=null;
+ for(const url of FEED_URLS){try{const response=await fetch(url,{headers:{Accept:"application/rss+xml, application/xml, text/xml"},cache:"no-store"});if(!response.ok)throw new Error("HTTP "+response.status);const xml=new DOMParser().parseFromString(await response.text(),"application/xml");if(xml.querySelector("parsererror"))throw new Error("Некорректный RSS");const items=[...xml.querySelectorAll("item")].map(n=>({title:n.querySelector("title")?.textContent,description:n.querySelector("description")?.textContent,link:n.querySelector("link")?.textContent,pubDate:n.querySelector("pubDate")?.textContent}));if(!items.length)throw new Error("В RSS нет публикаций");grid.replaceChildren(...items.slice(0,9).map(card));statusEl.textContent="Автоматическая лента подключена · обновлено "+new Date().toLocaleTimeString("ru-RU",{hour:"2-digit",minute:"2-digit"});return;}catch(e){lastError=e;}}
+ statusEl.textContent="Не удалось получить RSS сейчас. Открой официальный канал — публикации доступны там.";grid.replaceChildren();const fallback=document.createElement("article");fallback.className="news-card featured";fallback.innerHTML='<div class="meta">MTV NEWS / TELEGRAM</div><h3>Новости MTV Россия</h3><p>Автоматическая RSS-лента временно недоступна. Перейдите в официальный канал, чтобы читать последние публикации.</p><a class="read" href="https://t.me/mtv_1russia" target="_blank" rel="noopener">Открыть @mtv_1russia ↗</a>';grid.append(fallback);console.warn("Telegram RSS unavailable",lastError);}
+ finally{refresh.disabled=false;}}
+refresh.addEventListener("click",loadFeed);loadFeed();setInterval(loadFeed,5*60*1000);
